@@ -9,7 +9,7 @@ fn parse_html(a: String) -> PyResult<String> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn html_tools(_py: Python, m: &PyModule) -> PyResult<()> {
+fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_html, m)?)?;
     Ok(())
 }
