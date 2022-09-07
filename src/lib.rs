@@ -1,10 +1,12 @@
 use kuchiki::{traits::TendrilSink, NodeRef};
 use pyo3::prelude::*;
 
-const REMOVE_TAGS: [&'static str; 22] = [
+const REMOVE_TAGS: [&'static str; 25] = [
+    // scripts/styles
     "script",
     "style",
     "noscript",
+    // COOKIE BANNERS
     "#coiOverlay",
     ".CookiesOK",
     "#closeCookieBanner",
@@ -24,6 +26,10 @@ const REMOVE_TAGS: [&'static str; 22] = [
     ".cookie-notification .js-cookie-notification-hide",
     ".js-accept-cookie-policy",
     "#moove_gdpr_cookie_info_bar",
+    // testimonials
+    ".testimonial",
+    ".testimonial-text",
+    ".pwr-testimonial__quote", // hubspot
 ];
 
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
@@ -54,7 +60,6 @@ fn parse_html(html: String) -> PyResult<String> {
     for tag in PICK_TAGS {
         let mut text: Vec<String> = get_text_and_remove(&document, tag)
             .iter()
-            // .filter(|x| count_words(x.as_str()) < 200)
             .take(30)
             .cloned()
             .collect();
@@ -79,40 +84,22 @@ fn parse_html(html: String) -> PyResult<String> {
         .take(30)
         .collect();
 
-    // println!("COUCOU");
-    // println!("{:?}", paragraphs);
-
     result.append(&mut paragraphs);
-    // println!("{:?}", text);
-    // .cloned()
-    // .collect();
-    // let document_str = document.text_contents();
 
-    // let mut finder = LinkFinder::new();
-    // finder.url_must_have_scheme(false);
-    // let links: Vec<_> = finder.links(document_str.as_str()).collect();
+    if result.len() < 10 {
+        let mut extra = document
+            .text_contents()
+            .split("\n")
+            .map(|n| n.replace("\t", "").trim().to_string())
+            .filter(|n| !n.is_empty() && count_words(n) > 3)
+            .map(|n| trim_punctuation(&n))
+            .take(10)
+            .collect::<Vec<String>>();
 
-    // for link in links {
-    //     document_str.replace(link.as_str(), "");
-    //     // println!("{:?}", link.as_str());
-    // }
+        result.append(&mut extra);
+    }
 
-    // let beautified = document
-    //     .text_contents()
-    //     .split("\n")
-    //     .map(|n| n.replace("\t", "").trim().to_string())
-    //     .filter(|n| !n.is_empty())
-    //     .map(|n| trim_punctuation(&n))
-    //     .collect::<Vec<String>>()
-    //     .join("\n");
-
-    // println!("{}", beautified);
-
-    Ok(result
-        // .iter()
-        // .filter(|n| count_words(n) > 1)
-        // .collect()
-        .join("\n"))
+    Ok(result.join("\n"))
 }
 
 fn get_text_and_remove(document: &NodeRef, tag: &str) -> Vec<String> {
