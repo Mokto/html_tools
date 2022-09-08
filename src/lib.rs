@@ -1,5 +1,5 @@
 use kuchiki::{traits::TendrilSink, NodeRef};
-use pyo3::prelude::*;
+use pyo3::{descr, prelude::*};
 
 const REMOVE_TAGS: [&'static str; 25] = [
     // scripts/styles
@@ -86,20 +86,67 @@ fn parse_html(html: String) -> PyResult<String> {
 
     result.append(&mut paragraphs);
 
-    if result.len() < 10 {
-        let mut extra = document
-            .text_contents()
-            .split("\n")
-            .map(|n| n.replace("\t", "").trim().to_string())
-            .filter(|n| !n.is_empty() && count_words(n) > 3)
-            .map(|n| trim_punctuation(&n))
-            .take(10)
-            .collect::<Vec<String>>();
-
-        result.append(&mut extra);
+    // Description
+    let description = get_description(&document);
+    if description.is_some() {
+        result.push(description.clone().unwrap());
     }
+    if result.len() < 10 {
+        if description.is_some() {
+            let description = description.unwrap();
+            let description = description.as_str();
+            result.push(description.to_string());
+            result.push(description.to_string());
+            result.push(description.to_string());
+            result.push(description.to_string());
+        }
+    }
+    //     let mut text: Vec<String> = get_text_and_remove(&document, "div")
+    //         .iter()
+    //         .take(30)
+    //         .cloned()
+    //         .collect();
+
+    //     for i in text {
+    //         println!("------");
+    //         println!("{}", i);
+    //     }
+    //     // let mut extra = document
+    //     //     .text_contents()
+    //     //     .split("\n")
+    //     //     // .map(|n| n.replace("\t", "").trim().to_string())
+    //     //     // .filter(|n| !n.is_empty() && count_words(n) > 3)
+    //     //     // .map(|n| trim_punctuation(&n))
+    //     //     // .take(10)
+    //     //     .collect::<Vec<String>>();
+
+    //     // result.append(&mut extra);
+    //     // println!("{:?}", text)
+    // }
 
     Ok(result.join("\n"))
+
+    // Ok(result
+    //     .iter()
+    //     .filter(|n| count_words(n) > 2)
+    //     .cloned()
+    //     .collect::<Vec<String>>()
+    //     .join("\n"))
+}
+
+fn get_description(document: &NodeRef) -> Option<String> {
+    let tag_nodes = document.select("meta").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let name_attribute = attributes.get("name").unwrap_or("");
+        if name_attribute == "description" || name_attribute == "og:description" {
+            let content_attribute = attributes.get("content").unwrap_or("");
+            if !content_attribute.is_empty() {
+                return Some(content_attribute.to_string());
+            }
+        }
+    }
+    return None;
 }
 
 fn get_text_and_remove(document: &NodeRef, tag: &str) -> Vec<String> {
