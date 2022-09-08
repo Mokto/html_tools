@@ -1,7 +1,7 @@
 use kuchiki::{traits::TendrilSink, NodeRef};
 use pyo3::{descr, prelude::*};
 
-const REMOVE_TAGS: [&'static str; 25] = [
+const REMOVE_TAGS: [&'static str; 27] = [
     // scripts/styles
     "script",
     "style",
@@ -13,6 +13,7 @@ const REMOVE_TAGS: [&'static str; 25] = [
     ".CookieBanner-button",
     "#nts-set-cookie",
     ".cc_btn_accept_all",
+    ".cookies",
     ".noticeCookiesContent .CustomDismissCtrl",
     ".cookie-consent .cookie-btn",
     "#accept-cookies",
@@ -26,6 +27,7 @@ const REMOVE_TAGS: [&'static str; 25] = [
     ".cookie-notification .js-cookie-notification-hide",
     ".js-accept-cookie-policy",
     "#moove_gdpr_cookie_info_bar",
+    ".pea_cook_wrapper",
     // testimonials
     ".testimonial",
     ".testimonial-text",
@@ -36,7 +38,17 @@ const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
 fn parse_html(html: String) -> PyResult<String> {
+    let mut result: Vec<String> = vec![];
+
     let document = kuchiki::parse_html().one(html);
+
+    // let mut text: Vec<String> = get_text_and_remove(&document, "li")
+    //     .iter()
+    //     .take(30)
+    //     .cloned()
+    //     .collect();
+
+    // result.append(&mut text);
 
     for tag in REMOVE_TAGS {
         remove_tag(&document, tag);
@@ -54,8 +66,6 @@ fn parse_html(html: String) -> PyResult<String> {
         remove_tag(&document, ".footer");
         remove_tag(&document, ".footer-hero");
     }
-
-    let mut result: Vec<String> = vec![];
 
     for tag in PICK_TAGS {
         let mut text: Vec<String> = get_text_and_remove(&document, tag)
@@ -85,22 +95,6 @@ fn parse_html(html: String) -> PyResult<String> {
         .collect();
 
     result.append(&mut paragraphs);
-
-    // Description
-    let description = get_description(&document);
-    if description.is_some() {
-        result.push(description.clone().unwrap());
-    }
-    if result.len() < 10 {
-        if description.is_some() {
-            let description = description.unwrap();
-            let description = description.as_str();
-            result.push(description.to_string());
-            result.push(description.to_string());
-            result.push(description.to_string());
-            result.push(description.to_string());
-        }
-    }
     //     let mut text: Vec<String> = get_text_and_remove(&document, "div")
     //         .iter()
     //         .take(30)
@@ -124,14 +118,45 @@ fn parse_html(html: String) -> PyResult<String> {
     //     // println!("{:?}", text)
     // }
 
-    Ok(result.join("\n"))
+    // result.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
+    result.sort();
+    result.dedup();
+    // Ok(result.join("\n"))
 
-    // Ok(result
-    //     .iter()
-    //     .filter(|n| count_words(n) > 2)
-    //     .cloned()
-    //     .collect::<Vec<String>>()
-    //     .join("\n"))
+    // Description
+    let description = get_description(&document);
+    if description.is_some() {
+        result.push(description.clone().unwrap());
+    }
+    if result.len() < 30 {
+        if description.is_some() {
+            let description = description.unwrap();
+            let description = description.as_str();
+            let mut i = result.len();
+            while i < 20 {
+                result.push(description.to_string());
+                i = i + 1;
+            }
+        }
+    }
+
+    // Keywords
+    let keywords = get_keywords(&document);
+    if keywords.is_some() {
+        result.push(keywords.unwrap().to_string());
+        // for keyword in keywords.unwrap().split(", ") {
+        //     result.push(keyword.to_string());
+        //     println!("PUSHING KEYWORD: {}", keyword);
+        // }
+        // println!("{:?}")
+    }
+
+    Ok(result
+        .iter()
+        .filter(|n| !n.to_lowercase().contains("cookie"))
+        .cloned()
+        .collect::<Vec<String>>()
+        .join("\n"))
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
@@ -140,6 +165,20 @@ fn get_description(document: &NodeRef) -> Option<String> {
         let attributes = tag_node.attributes.borrow();
         let name_attribute = attributes.get("name").unwrap_or("");
         if name_attribute == "description" || name_attribute == "og:description" {
+            let content_attribute = attributes.get("content").unwrap_or("");
+            if !content_attribute.is_empty() {
+                return Some(content_attribute.to_string());
+            }
+        }
+    }
+    return None;
+}
+fn get_keywords(document: &NodeRef) -> Option<String> {
+    let tag_nodes = document.select("meta").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let name_attribute = attributes.get("name").unwrap_or("");
+        if name_attribute == "keywords" {
             let content_attribute = attributes.get("content").unwrap_or("");
             if !content_attribute.is_empty() {
                 return Some(content_attribute.to_string());
