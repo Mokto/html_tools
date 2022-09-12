@@ -1,5 +1,6 @@
 use kuchiki::{traits::TendrilSink, NodeRef};
-use pyo3::{descr, prelude::*};
+use pyo3::prelude::*;
+use regex::RegexBuilder;
 
 const REMOVE_TAGS: [&'static str; 27] = [
     // scripts/styles
@@ -37,18 +38,10 @@ const REMOVE_TAGS: [&'static str; 27] = [
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
-fn parse_html(html: String) -> PyResult<String> {
+fn parse_html(html: String, stop_word: String) -> PyResult<String> {
     let mut result: Vec<String> = vec![];
 
     let document = kuchiki::parse_html().one(html);
-
-    // let mut text: Vec<String> = get_text_and_remove(&document, "li")
-    //     .iter()
-    //     .take(30)
-    //     .cloned()
-    //     .collect();
-
-    // result.append(&mut text);
 
     for tag in REMOVE_TAGS {
         remove_tag(&document, tag);
@@ -95,45 +88,37 @@ fn parse_html(html: String) -> PyResult<String> {
         .collect();
 
     result.append(&mut paragraphs);
-    //     let mut text: Vec<String> = get_text_and_remove(&document, "div")
-    //         .iter()
-    //         .take(30)
-    //         .cloned()
-    //         .collect();
 
-    //     for i in text {
-    //         println!("------");
-    //         println!("{}", i);
-    //     }
-    //     // let mut extra = document
-    //     //     .text_contents()
-    //     //     .split("\n")
-    //     //     // .map(|n| n.replace("\t", "").trim().to_string())
-    //     //     // .filter(|n| !n.is_empty() && count_words(n) > 3)
-    //     //     // .map(|n| trim_punctuation(&n))
-    //     //     // .take(10)
-    //     //     .collect::<Vec<String>>();
-
-    //     // result.append(&mut extra);
-    //     // println!("{:?}", text)
-    // }
-
-    // result.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
     result.sort();
     result.dedup();
-    // Ok(result.join("\n"))
 
-    // Description
+    let stop_word_regex = RegexBuilder::new(stop_word.as_str())
+        .case_insensitive(true)
+        .build()
+        .expect("Invalid Regex");
+
+    result = result
+        .iter()
+        .map(|n| {
+            stop_word_regex
+                .replace_all(&n, "")
+                .to_string()
+                .trim()
+                .to_string()
+        })
+        .filter(|n| !n.to_lowercase().contains("cookie") && !n.contains("©") && count_words(n) > 0)
+        .collect();
+
     let description = get_description(&document);
     if description.is_some() {
         result.push(description.clone().unwrap());
     }
-    if result.len() < 30 {
+    if result.len() < 25 {
         if description.is_some() {
             let description = description.unwrap();
             let description = description.as_str();
             let mut i = result.len();
-            while i < 20 {
+            while i < 25 {
                 result.push(description.to_string());
                 i = i + 1;
             }
@@ -144,19 +129,9 @@ fn parse_html(html: String) -> PyResult<String> {
     let keywords = get_keywords(&document);
     if keywords.is_some() {
         result.push(keywords.unwrap().to_string());
-        // for keyword in keywords.unwrap().split(", ") {
-        //     result.push(keyword.to_string());
-        //     println!("PUSHING KEYWORD: {}", keyword);
-        // }
-        // println!("{:?}")
     }
 
-    Ok(result
-        .iter()
-        .filter(|n| !n.to_lowercase().contains("cookie"))
-        .cloned()
-        .collect::<Vec<String>>()
-        .join("\n"))
+    Ok(result.join("\n"))
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
