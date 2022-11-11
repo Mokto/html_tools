@@ -23,7 +23,7 @@ jobs:
         with:
           maturin-version: latest
           command: build
-          args: --release --sdist -i 3.8 3.9 3.10
+          args: --release --sdist -i 3.8 3.9 3.10 3.11
       #  - name: Build wheels
       #    run: |
       #      curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -39,7 +39,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, "3.10"]
+        python-version: [3.8, 3.9, "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -88,6 +88,7 @@ jobs:
 
       - run: mkdir wheels
       - run: mv ./linux-wheels/* wheels
+      - run: mv ./osx-3.11-wheel/* wheels
       - run: mv ./osx-3.10-wheel/* wheels
       - run: mv ./osx-3.9-wheel/* wheels
       - run: mv ./osx-3.8-wheel/* wheels
