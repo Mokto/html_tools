@@ -38,7 +38,7 @@ const REMOVE_TAGS: [&'static str; 27] = [
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
-fn parse_html(html: String, stop_word: String) -> PyResult<String> {
+fn parse_html(html: String, stop_word: String, force_strong_description: bool) -> PyResult<String> {
     let mut result: Vec<String> = vec![];
 
     let document = kuchiki::parse_html().one(html);
@@ -113,7 +113,7 @@ fn parse_html(html: String, stop_word: String) -> PyResult<String> {
     if description.is_some() {
         result.push(description.clone().unwrap());
     }
-    if result.len() < 25 {
+    if result.len() < 25 && force_strong_description {
         if description.is_some() {
             let description = description.unwrap();
             let description = description.as_str();
