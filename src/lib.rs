@@ -154,8 +154,11 @@ fn get_emails(html: String) -> PyResult<Vec<String>> {
 }
 
 #[pyfunction]
-fn text_contents(html: String) -> PyResult<String> {
+fn html_contents(html: String) -> PyResult<String> {
     let document = kuchiki::parse_html().one(html);
+    for tag in REMOVE_TAGS {
+        remove_tag(&document, tag);
+    }
     Ok(document.text_contents())
 }
 
@@ -216,7 +219,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_html, m)?)?;
     m.add_function(wrap_pyfunction!(get_emails, m)?)?;
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
-    m.add_function(wrap_pyfunction!(text_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(html_contents, m)?)?;
     Ok(())
 }
 
