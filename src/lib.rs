@@ -1,4 +1,5 @@
 use kuchiki::{traits::TendrilSink, NodeRef};
+use linkify::{LinkFinder, LinkKind};
 use pyo3::prelude::*;
 use regex::RegexBuilder;
 
@@ -134,6 +135,24 @@ fn parse_html(html: String, stop_word: String, force_strong_description: bool) -
     Ok(result.join("\n"))
 }
 
+#[pyfunction]
+fn get_links(html: String) -> PyResult<Vec<String>> {
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Url]);
+    let links = finder.links(html.as_str());
+    let links = links.map(|x| x.as_str().to_string());
+    Ok(links.collect::<Vec<String>>())
+}
+
+#[pyfunction]
+fn get_emails(html: String) -> PyResult<Vec<String>> {
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Email]);
+    let links = finder.links(html.as_str());
+    let links = links.map(|x| x.as_str().to_string());
+    Ok(links.collect::<Vec<String>>())
+}
+
 fn get_description(document: &NodeRef) -> Option<String> {
     let tag_nodes = document.select("meta").unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
@@ -189,6 +208,8 @@ fn remove_tag(document: &NodeRef, tag: &str) {
 #[pymodule]
 fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_html, m)?)?;
+    m.add_function(wrap_pyfunction!(get_emails, m)?)?;
+    m.add_function(wrap_pyfunction!(get_links, m)?)?;
     Ok(())
 }
 

@@ -3,7 +3,7 @@ name: publish-pypi
 on:
   push:
     branches:
-      - main
+      - v0.12
   # push:
   #   tags:
   #      - 'v*'
