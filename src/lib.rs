@@ -153,6 +153,12 @@ fn get_emails(html: String) -> PyResult<Vec<String>> {
     Ok(links.collect::<Vec<String>>())
 }
 
+#[pyfunction]
+fn text_contents(html: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    Ok(document.text_contents())
+}
+
 fn get_description(document: &NodeRef) -> Option<String> {
     let tag_nodes = document.select("meta").unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
@@ -210,6 +216,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_html, m)?)?;
     m.add_function(wrap_pyfunction!(get_emails, m)?)?;
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
+    m.add_function(wrap_pyfunction!(text_contents, m)?)?;
     Ok(())
 }
 
