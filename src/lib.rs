@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use kuchiki::{traits::TendrilSink, NodeRef};
 use linkify::{LinkFinder, LinkKind};
 use pyo3::prelude::*;
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
 
 const REMOVE_TAGS: [&'static str; 27] = [
     // scripts/styles
@@ -136,6 +138,73 @@ fn parse_html(html: String, stop_word: String, force_strong_description: bool) -
 }
 
 #[pyfunction]
+fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Vec<String>>> {
+    let mut result = HashMap::new();
+
+    let document = kuchiki::parse_html().one(html);
+
+    for tag in REMOVE_TAGS {
+        remove_tag(&document, tag);
+    }
+
+    if true {
+        remove_tag(&document, "header");
+        remove_tag(&document, "nav");
+        remove_tag(&document, ".header");
+        remove_tag(&document, ".header-hero");
+    }
+
+    if true {
+        remove_tag(&document, "footer");
+        remove_tag(&document, ".footer");
+        remove_tag(&document, ".footer-hero");
+    }
+
+    let stop_word_regex = RegexBuilder::new(stop_word.as_str())
+        .case_insensitive(true)
+        .build()
+        .expect("Invalid Regex");
+
+    for tag in PICK_TAGS {
+        let text: Vec<String> = get_text_and_remove(&document, tag)
+            .iter()
+            .cloned()
+            .collect();
+
+        result.insert(tag.to_string(), apply(text, stop_word_regex.clone()));
+    }
+
+    let mut paragraphs: Vec<String> = get_text_and_remove(&document, "p");
+    paragraphs.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
+
+    let paragraphs: Vec<String> = paragraphs
+        .iter()
+        .filter(|x| count_words(x.as_str()) > 2)
+        .map(|x| x.split(". "))
+        .flatten()
+        .map(|x| x.split("! "))
+        .flatten()
+        .map(|x| x.split("? "))
+        .flatten()
+        .map(|x| x.to_string())
+        // .filter(|x| count_words(x.as_str()) < 128)
+        // .take(30)
+        .collect();
+
+    result.insert("p".to_string(), apply(paragraphs, stop_word_regex.clone()));
+
+    let description = get_description(&document);
+    if description.is_some() {
+        result.insert(
+            "description".to_string(),
+            vec![description.clone().unwrap()],
+        );
+    }
+
+    Ok(result)
+}
+
+#[pyfunction]
 fn get_links(html: String) -> PyResult<Vec<String>> {
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Url]);
@@ -160,6 +229,20 @@ fn html_contents(html: String) -> PyResult<String> {
         remove_tag(&document, tag);
     }
     Ok(document.to_string())
+}
+
+fn apply(sentences: Vec<String>, stop_word_regex: Regex) -> Vec<String> {
+    sentences
+        .iter()
+        .map(|n| {
+            stop_word_regex
+                .replace_all(&n, "")
+                .to_string()
+                .trim()
+                .to_string()
+        })
+        .filter(|n| !n.to_lowercase().contains("cookie") && !n.contains("©") && count_words(n) > 0)
+        .collect()
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
@@ -220,6 +303,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_emails, m)?)?;
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
     m.add_function(wrap_pyfunction!(html_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
     Ok(())
 }
 

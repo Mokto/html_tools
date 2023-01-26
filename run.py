@@ -491,5 +491,5 @@ a.ng||(a.ng={});b.conf.disabled||a.conf.spa2||a.monitor.setUpMonitors(b.ngMonito
 """
 
 
-print(html_parsing_tools.parse_html(html, "tesco"))
+print(html_parsing_tools.get_sentences(html, "tesco"))
 # html_parsing_tools.parse_html(html)
