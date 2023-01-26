@@ -159,7 +159,7 @@ fn html_contents(html: String) -> PyResult<String> {
     for tag in REMOVE_TAGS {
         remove_tag(&document, tag);
     }
-    Ok(document.text_contents())
+    Ok(document.to_string())
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
