@@ -214,6 +214,25 @@ fn get_links(html: String) -> PyResult<Vec<String>> {
 }
 
 #[pyfunction]
+fn get_href_attributes(html: String) -> PyResult<Vec<String>> {
+    let document = kuchiki::parse_html().one(html);
+    // let mut links: Vec<String> = vec![];
+
+    let links: Vec<String> = document
+        .select("a")
+        .unwrap()
+        // .collect()
+        .map(|x| {
+            let attributes = x.attributes.borrow();
+            let href = attributes.get("href").unwrap();
+            href.to_string()
+        })
+        .collect();
+
+    Ok(links)
+}
+
+#[pyfunction]
 fn get_emails(html: String) -> PyResult<Vec<String>> {
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Email]);
@@ -304,6 +323,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
     m.add_function(wrap_pyfunction!(html_contents, m)?)?;
     m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
+    m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
     Ok(())
 }
 
