@@ -201,6 +201,12 @@ fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Ve
         );
     }
 
+    // Keywords
+    let keywords = get_keywords(&document);
+    if keywords.is_some() {
+        result.insert("keywords".to_string(), vec![keywords.unwrap().to_string()]);
+    }
+
     Ok(result)
 }
 
