@@ -340,6 +340,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_emails, m)?)?;
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
     m.add_function(wrap_pyfunction!(html_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(tag_html_contents, m)?)?;
     m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
     m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
     Ok(())
