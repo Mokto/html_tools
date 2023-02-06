@@ -256,6 +256,18 @@ fn html_contents(html: String) -> PyResult<String> {
     Ok(document.to_string())
 }
 
+#[pyfunction]
+fn tag_html_contents(html: String, tag: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    let document = document.select_first(tag.as_str());
+    let res = match document {
+        Ok(v) => v.as_node().to_string(),
+        Err(_) => "".to_string(),
+    };
+
+    Ok(res)
+}
+
 fn apply(sentences: Vec<String>, stop_word_regex: Regex) -> Vec<String> {
     sentences
         .iter()
