@@ -230,8 +230,11 @@ fn get_href_attributes(html: String) -> PyResult<Vec<String>> {
         // .collect()
         .map(|x| {
             let attributes = x.attributes.borrow();
-            let href = attributes.get("href").unwrap();
-            href.to_string()
+            let href = attributes.get("href");
+            if href.is_none() {
+                return "".to_string();
+            }
+            href.unwrap().to_string()
         })
         .collect();
 
