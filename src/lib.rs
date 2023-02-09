@@ -41,103 +41,6 @@ const REMOVE_TAGS: [&'static str; 27] = [
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
-fn parse_html(html: String, stop_word: String, force_strong_description: bool) -> PyResult<String> {
-    let mut result: Vec<String> = vec![];
-
-    let document = kuchiki::parse_html().one(html);
-
-    for tag in REMOVE_TAGS {
-        remove_tag(&document, tag);
-    }
-
-    if true {
-        remove_tag(&document, "header");
-        remove_tag(&document, "nav");
-        remove_tag(&document, ".header");
-        remove_tag(&document, ".header-hero");
-    }
-
-    if true {
-        remove_tag(&document, "footer");
-        remove_tag(&document, ".footer");
-        remove_tag(&document, ".footer-hero");
-    }
-
-    for tag in PICK_TAGS {
-        let mut text: Vec<String> = get_text_and_remove(&document, tag)
-            .iter()
-            .take(30)
-            .cloned()
-            .collect();
-
-        result.append(&mut text)
-    }
-
-    let mut paragraphs: Vec<String> = get_text_and_remove(&document, "p");
-    paragraphs.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
-
-    let mut paragraphs: Vec<String> = paragraphs
-        .iter()
-        .filter(|x| count_words(x.as_str()) > 2)
-        .map(|x| x.split(". "))
-        .flatten()
-        .map(|x| x.split("! "))
-        .flatten()
-        .map(|x| x.split("? "))
-        .flatten()
-        .map(|x| x.to_string())
-        .filter(|x| count_words(x.as_str()) < 128)
-        .take(30)
-        .collect();
-
-    result.append(&mut paragraphs);
-
-    result.sort();
-    result.dedup();
-
-    let stop_word_regex = RegexBuilder::new(stop_word.as_str())
-        .case_insensitive(true)
-        .build()
-        .expect("Invalid Regex");
-
-    result = result
-        .iter()
-        .map(|n| {
-            stop_word_regex
-                .replace_all(&n, "")
-                .to_string()
-                .trim()
-                .to_string()
-        })
-        .filter(|n| !n.to_lowercase().contains("cookie") && !n.contains("©") && count_words(n) > 0)
-        .collect();
-
-    let description = get_description(&document);
-    if description.is_some() {
-        result.push(description.clone().unwrap());
-    }
-    if result.len() < 25 && force_strong_description {
-        if description.is_some() {
-            let description = description.unwrap();
-            let description = description.as_str();
-            let mut i = result.len();
-            while i < 25 {
-                result.push(description.to_string());
-                i = i + 1;
-            }
-        }
-    }
-
-    // Keywords
-    let keywords = get_keywords(&document);
-    if keywords.is_some() {
-        result.push(keywords.unwrap().to_string());
-    }
-
-    Ok(result.join("\n"))
-}
-
-#[pyfunction]
 fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Vec<String>>> {
     let mut result = HashMap::new();
 
@@ -206,6 +109,8 @@ fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Ve
     if keywords.is_some() {
         result.insert("keywords".to_string(), vec![keywords.unwrap().to_string()]);
     }
+
+    result.insert("all".to_string(), vec![document.text_contents()]);
 
     Ok(result)
 }
@@ -339,7 +244,6 @@ fn remove_tag(document: &NodeRef, tag: &str) {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(parse_html, m)?)?;
     m.add_function(wrap_pyfunction!(get_emails, m)?)?;
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
     m.add_function(wrap_pyfunction!(html_contents, m)?)?;
