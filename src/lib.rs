@@ -51,8 +51,8 @@ fn get_sentences(
     let document = kuchiki::parse_html().one(html);
 
     let json_ld = get_json_ld(&document);
-    if json_ld.is_some() {
-        result.insert("json_ld".to_string(), vec![json_ld.unwrap()]);
+    if json_ld.len() > 0 {
+        result.insert("json_ld".to_string(), json_ld);
     }
 
     for tag in REMOVE_TAGS {
@@ -199,16 +199,17 @@ fn apply(sentences: Vec<String>, stop_word_regex: Regex) -> Vec<String> {
         .collect()
 }
 
-fn get_json_ld(document: &NodeRef) -> Option<String> {
+fn get_json_ld(document: &NodeRef) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
     let tag_nodes = document.select("script").unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
         let attributes = tag_node.attributes.borrow();
         let type_attribute = attributes.get("type").unwrap_or("");
         if type_attribute == "application/ld+json" {
-            return Some(tag_node.text_contents());
+            result.push(tag_node.text_contents());
         }
     }
-    return None;
+    return result;
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
