@@ -41,7 +41,11 @@ const REMOVE_TAGS: [&'static str; 27] = [
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
-fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Vec<String>>> {
+fn get_sentences(
+    html: String,
+    stop_word: String,
+    remove_header_footer: bool,
+) -> PyResult<HashMap<String, Vec<String>>> {
     let mut result = HashMap::new();
 
     let document = kuchiki::parse_html().one(html);
@@ -50,14 +54,14 @@ fn get_sentences(html: String, stop_word: String) -> PyResult<HashMap<String, Ve
         remove_tag(&document, tag);
     }
 
-    if true {
+    if remove_header_footer {
         remove_tag(&document, "header");
         remove_tag(&document, "nav");
         remove_tag(&document, ".header");
         remove_tag(&document, ".header-hero");
     }
 
-    if true {
+    if remove_header_footer {
         remove_tag(&document, "footer");
         remove_tag(&document, ".footer");
         remove_tag(&document, ".footer-hero");
