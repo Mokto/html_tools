@@ -46,6 +46,10 @@ fn get_sentences(
     stop_word: String,
     remove_header_footer: bool,
 ) -> PyResult<HashMap<String, Vec<String>>> {
+    let html = html
+        .replace("<br>", " ")
+        .replace("<br/>", " ")
+        .replace("<br />", " ");
     let mut result = HashMap::new();
 
     let document = kuchiki::parse_html().one(html);
