@@ -228,10 +228,11 @@ fn get_rel_alternate(document: &NodeRef) -> HashMap<String, String> {
         let attributes = tag_node.attributes.borrow();
         let type_attribute = attributes.get("rel").unwrap_or("");
         if type_attribute == "alternate" {
-            result.insert(
-                attributes.get("hreflang").unwrap_or("").to_string(),
-                attributes.get("href").unwrap_or("").to_string(),
-            );
+            let hreflang = attributes.get("hreflang").unwrap_or("").to_string();
+            if hreflang.is_empty() {
+                continue;
+            }
+            result.insert(hreflang, attributes.get("href").unwrap_or("").to_string());
         }
     }
     return result;
