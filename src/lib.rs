@@ -47,9 +47,9 @@ fn get_sentences(
     remove_header_footer: bool,
 ) -> PyResult<HashMap<String, Vec<String>>> {
     let html = html
-        .replace("<br>", " | ")
-        .replace("<br/>", " | ")
-        .replace("<br />", " | ");
+        .replace("<br>", " ")
+        .replace("<br/>", " ")
+        .replace("<br />", " ");
     let mut result = HashMap::new();
 
     let document = kuchiki::parse_html().one(html);
@@ -95,12 +95,12 @@ fn get_sentences(
     let paragraphs: Vec<String> = paragraphs
         .iter()
         .filter(|x| count_words(x.as_str()) > 2)
-        .map(|x| x.split(". "))
-        .flatten()
-        .map(|x| x.split("! "))
-        .flatten()
-        .map(|x| x.split("? "))
-        .flatten()
+        // .map(|x| x.split(". "))
+        // .flatten()
+        // .map(|x| x.split("! "))
+        // .flatten()
+        // .map(|x| x.split("? "))
+        // .flatten()
         .map(|x| x.to_string())
         // .filter(|x| count_words(x.as_str()) < 128)
         // .take(30)
