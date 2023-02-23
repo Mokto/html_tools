@@ -59,6 +59,11 @@ fn get_sentences(
         result.insert("json_ld".to_string(), json_ld);
     }
 
+    let rel_alternate = get_rel_alternate(&document);
+    if rel_alternate.len() > 0 {
+        result.insert("rel_alternate".to_string(), rel_alternate);
+    }
+
     for tag in REMOVE_TAGS {
         remove_tag(&document, tag);
     }
@@ -211,6 +216,22 @@ fn get_json_ld(document: &NodeRef) -> Vec<String> {
         let type_attribute = attributes.get("type").unwrap_or("");
         if type_attribute == "application/ld+json" {
             result.push(tag_node.text_contents());
+        }
+    }
+    return result;
+}
+
+fn get_rel_alternate(document: &NodeRef) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    let tag_nodes = document.select("link").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let type_attribute = attributes.get("rel").unwrap_or("");
+        if type_attribute == "alternate" {
+            let mut value = attributes.get("hreflang").unwrap_or("").to_string();
+            value.push_str(":");
+            value.push_str(attributes.get("href").unwrap_or(""));
+            result.push(value);
         }
     }
     return result;
