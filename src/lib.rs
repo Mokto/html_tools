@@ -194,6 +194,22 @@ fn tag_html_contents(html: String, tag: String) -> PyResult<String> {
     Ok(res)
 }
 
+#[pyfunction]
+fn get_lang(html: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    Ok(get_lang_internal(&document))
+}
+
+fn get_lang_internal(document: &NodeRef) -> String {
+    let tag_nodes = document.select("html").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let type_attribute = attributes.get("lang").unwrap_or("");
+        return type_attribute.to_string();
+    }
+    return "".to_string();
+}
+
 fn apply(sentences: Vec<String>, stop_word_regex: Regex) -> Vec<String> {
     sentences
         .iter()
@@ -299,6 +315,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
     m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
     m.add_function(wrap_pyfunction!(get_alternate_links, m)?)?;
+    m.add_function(wrap_pyfunction!(get_lang, m)?)?;
     Ok(())
 }
 
