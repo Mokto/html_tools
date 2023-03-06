@@ -128,15 +128,6 @@ fn get_sentences(
 }
 
 #[pyfunction]
-fn get_links(html: String) -> PyResult<Vec<String>> {
-    let mut finder = LinkFinder::new();
-    finder.kinds(&[LinkKind::Url]);
-    let links = finder.links(html.as_str());
-    let links = links.map(|x| x.as_str().to_string());
-    Ok(links.collect::<Vec<String>>())
-}
-
-#[pyfunction]
 fn get_href_attributes(html: String) -> PyResult<Vec<String>> {
     let document = kuchiki::parse_html().one(html);
     // let mut links: Vec<String> = vec![];
@@ -152,6 +143,29 @@ fn get_href_attributes(html: String) -> PyResult<Vec<String>> {
                 return "".to_string();
             }
             href.unwrap().to_string()
+        })
+        .collect();
+
+    Ok(links)
+}
+
+#[pyfunction]
+fn get_links(html: String) -> PyResult<Vec<(String, String)>> {
+    let document = kuchiki::parse_html().one(html);
+    // let mut links: Vec<String> = vec![];
+
+    let links: Vec<(String, String)> = document
+        .select("a")
+        .unwrap()
+        // .collect()
+        .map(|x| {
+            let attributes = x.attributes.borrow();
+            let href = attributes.get("href");
+            let text = x.text_contents();
+            if href.is_none() {
+                return ("".to_string(), text);
+            }
+            return (href.unwrap().to_string(), text);
         })
         .collect();
 
