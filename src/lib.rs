@@ -182,7 +182,7 @@ fn get_emails(html: String) -> PyResult<Vec<String>> {
 }
 
 #[pyfunction]
-fn get_alternate_links(html: String) -> PyResult<HashMap<String, String>> {
+fn get_alternate_links(html: String) -> PyResult<HashMap<String, Vec<String>>> {
     let document = kuchiki::parse_html().one(html);
     Ok(get_rel_alternate(&document))
 }
@@ -251,8 +251,8 @@ fn get_json_ld(document: &NodeRef) -> Vec<String> {
     return result;
 }
 
-fn get_rel_alternate(document: &NodeRef) -> HashMap<String, String> {
-    let mut result: HashMap<String, String> = HashMap::new();
+fn get_rel_alternate(document: &NodeRef) -> HashMap<String, Vec<String>> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let tag_nodes = document.select("link").unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
         let attributes = tag_node.attributes.borrow();
@@ -262,7 +262,17 @@ fn get_rel_alternate(document: &NodeRef) -> HashMap<String, String> {
             if hreflang.is_empty() {
                 continue;
             }
-            result.insert(hreflang, attributes.get("href").unwrap_or("").to_string());
+            if result.contains_key(hreflang.as_str()) {
+                let new_data = result.get(hreflang.as_str()).unwrap();
+                let new_array = vec![attributes.get("href").unwrap_or("").to_string()];
+                new_data.extend(new_array);
+                result.insert(hreflang, new_data.to_owned());
+            } else {
+                result.insert(
+                    hreflang,
+                    vec![attributes.get("href").unwrap_or("").to_string()],
+                );
+            }
         }
     }
     return result;
