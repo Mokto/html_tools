@@ -263,7 +263,7 @@ fn get_rel_alternate(document: &NodeRef) -> HashMap<String, Vec<String>> {
                 continue;
             }
             if result.contains_key(hreflang.as_str()) {
-                let new_data = result.get(hreflang.as_str()).unwrap();
+                let mut new_data = result.get(hreflang.as_str()).unwrap().clone();
                 let new_array = vec![attributes.get("href").unwrap_or("").to_string()];
                 new_data.extend(new_array);
                 result.insert(hreflang, new_data.to_owned());
