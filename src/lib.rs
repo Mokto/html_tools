@@ -182,6 +182,26 @@ fn get_emails(html: String) -> PyResult<Vec<String>> {
 }
 
 #[pyfunction]
+fn get_meta_titles(html: String) -> PyResult<HashMap<String, String>> {
+    let document = kuchiki::parse_html().one(html);
+    let mut result: HashMap<String, String> = HashMap::new();
+    let tag_nodes = document.select("meta").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes: std::cell::Ref<kuchiki::Attributes> = tag_node.attributes.borrow();
+        let name_attribute = attributes.get("name").unwrap_or("");
+        if name_attribute == "twitter:title" || name_attribute == "og:title" {
+            let content = attributes.get("content").unwrap_or("").to_string();
+            if content.is_empty() {
+                continue;
+            }
+            result.insert(name_attribute.to_string(), content);
+        }
+    }
+
+    Ok(result)
+}
+
+#[pyfunction]
 fn get_alternate_links(html: String) -> PyResult<HashMap<String, Vec<String>>> {
     let document = kuchiki::parse_html().one(html);
     Ok(get_rel_alternate(&document))
@@ -340,6 +360,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
     m.add_function(wrap_pyfunction!(get_alternate_links, m)?)?;
     m.add_function(wrap_pyfunction!(get_lang, m)?)?;
+    m.add_function(wrap_pyfunction!(get_meta_titles, m)?)?;
     Ok(())
 }
 
