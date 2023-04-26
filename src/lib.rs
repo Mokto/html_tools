@@ -197,6 +197,11 @@ fn get_meta_titles(html: String) -> PyResult<HashMap<String, String>> {
             result.insert(name_attribute.to_string(), content);
         }
     }
+    let tag_nodes: kuchiki::iter::Select<kuchiki::iter::Elements<kuchiki::iter::Descendants>> =
+        document.select("title").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        result.insert("title".to_string(), tag_node.text_contents().to_string());
+    }
 
     Ok(result)
 }
@@ -204,7 +209,8 @@ fn get_meta_titles(html: String) -> PyResult<HashMap<String, String>> {
 #[pyfunction]
 fn tag_attribute(html: String, tag: String, attribute: String) -> PyResult<String> {
     let document = kuchiki::parse_html().one(html);
-    let tag_nodes = document.select(tag.as_str()).unwrap();
+    let tag_nodes: kuchiki::iter::Select<kuchiki::iter::Elements<kuchiki::iter::Descendants>> =
+        document.select(tag.as_str()).unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
         let attributes: std::cell::Ref<kuchiki::Attributes> = tag_node.attributes.borrow();
         return Ok(attributes.get(attribute).unwrap_or("").to_string());
