@@ -202,6 +202,18 @@ fn get_meta_titles(html: String) -> PyResult<HashMap<String, String>> {
 }
 
 #[pyfunction]
+fn tag_attribute(html: String, tag: String, attribute: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    let tag_nodes = document.select(tag.as_str()).unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes: std::cell::Ref<kuchiki::Attributes> = tag_node.attributes.borrow();
+        return Ok(attributes.get(attribute).unwrap_or("").to_string());
+    }
+
+    Ok("".to_string())
+}
+
+#[pyfunction]
 fn get_alternate_links(html: String) -> PyResult<HashMap<String, Vec<String>>> {
     let document = kuchiki::parse_html().one(html);
     Ok(get_rel_alternate(&document))
@@ -356,6 +368,7 @@ fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_links, m)?)?;
     m.add_function(wrap_pyfunction!(html_contents, m)?)?;
     m.add_function(wrap_pyfunction!(tag_html_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(tag_attribute, m)?)?;
     m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
     m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
     m.add_function(wrap_pyfunction!(get_alternate_links, m)?)?;
