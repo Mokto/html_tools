@@ -5,6 +5,8 @@ use linkify::{LinkFinder, LinkKind};
 use pyo3::prelude::*;
 use regex::{Regex, RegexBuilder};
 
+const REMOVE_TAGS_HTML_CONTENTS: [&'static str; 3] = ["script", "style", "noscript"];
+
 const REMOVE_TAGS: [&'static str; 27] = [
     // scripts/styles
     "script",
@@ -228,7 +230,7 @@ fn get_alternate_links(html: String) -> PyResult<HashMap<String, Vec<String>>> {
 #[pyfunction]
 fn html_contents(html: String) -> PyResult<String> {
     let document = kuchiki::parse_html().one(html);
-    for tag in REMOVE_TAGS {
+    for tag in REMOVE_TAGS_HTML_CONTENTS {
         remove_tag(&document, tag);
     }
     Ok(document.to_string())
