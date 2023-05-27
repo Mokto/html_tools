@@ -47,6 +47,7 @@ fn get_sentences(
     html: String,
     stop_word: String,
     remove_header_footer: bool,
+    add_full_ordered_text: bool,
 ) -> PyResult<HashMap<String, Vec<String>>> {
     let html = html
         .replace("<br>", " ")
@@ -81,6 +82,12 @@ fn get_sentences(
         .case_insensitive(true)
         .build()
         .expect("Invalid Regex");
+
+    if add_full_ordered_text {
+        let mut full_text = get_full_text(&document);
+        full_text = apply(full_text, stop_word_regex.clone());
+        result.insert("full".to_string(), full_text);
+    }
 
     for tag in PICK_TAGS {
         let text: Vec<String> = get_text_and_remove(&document, tag)
@@ -361,6 +368,15 @@ fn get_text_and_remove(document: &NodeRef, tag: &str) -> Vec<String> {
     return result;
 }
 
+fn get_full_text(document: &NodeRef) -> Vec<String> {
+    document.text_contents()
+        .split('\n')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
 fn remove_tag(document: &NodeRef, tag: &str) {
     let tag_nodes = document.select(tag).unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
@@ -427,4 +443,43 @@ fn count_words(s: &str) -> usize {
         total += 1
     }
     total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_sentences() {
+        let html = "\
+            <html>
+            <body>
+            <h1>H1 header</h1>
+            <p>p _stop_ tag</p>
+            </body>
+            </html>
+            ".to_string();
+
+        let result = get_sentences(
+            html,
+            "_stop_".to_string(),
+            false,
+            true,
+        ).unwrap();
+
+        assert_eq!(
+            result["full"],
+            vec!["H1 header", "p  tag"],
+        );
+
+        assert_eq!(
+            result["h1"],
+            vec!["H1 header"],
+        );
+
+        assert_eq!(
+            result["p"],
+            vec!["p  tag"],
+        );
+    }
 }
