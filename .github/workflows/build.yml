@@ -11,7 +11,9 @@ on:
 jobs:
   linux-wheels:
     runs-on: ubuntu-latest
-    # container: quay.io/pypa/manylinux1_x86_64
+    strategy:
+      matrix:
+        target: [x86_64, i686, aarch64]
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -19,8 +21,9 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: messense/maturin-action@v1
+      - uses: PyO3/maturin-action@v1
         with:
+          target: ${{ matrix.target }}
           maturin-version: latest
           command: build
           args: --release --sdist -i 3.8 3.9 3.10 3.11
