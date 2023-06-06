@@ -3,7 +3,7 @@ name: publish-pypi
 on:
   push:
     branches:
-      - main
+      - v0.12
   # push:
   #   tags:
   #      - 'v*'
@@ -11,18 +11,26 @@ on:
 jobs:
   linux-wheels:
     runs-on: ubuntu-latest
-    # container: quay.io/pypa/manylinux1_x86_64
+    strategy:
+      matrix:
+        target: [x86_64, i686, aarch64]
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      # - uses: actions/setup-python@v4
+      #   with:
+      #     python-version: 3.9
+      #     architecture: x64
+      # - uses: actions-rs/toolchain@v1
+      #   with:
+      #     profile: minimal
+      #     toolchain: stable
+      #     override: true
+      - uses: PyO3/maturin-action@v1
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: messense/maturin-action@v1
-        with:
+          target: ${{ matrix.target }}
           maturin-version: latest
           command: build
+          manylinux: auto
           args: --release --sdist -i 3.8 3.9 3.10 3.11
       #  - name: Build wheels
       #    run: |

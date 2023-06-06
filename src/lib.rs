@@ -1,6 +1,11 @@
+use std::collections::HashMap;
+
 use kuchiki::{traits::TendrilSink, NodeRef};
+use linkify::{LinkFinder, LinkKind};
 use pyo3::prelude::*;
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
+
+const REMOVE_TAGS_HTML_CONTENTS: [&'static str; 3] = ["script", "style", "noscript"];
 
 const REMOVE_TAGS: [&'static str; 27] = [
     // scripts/styles
@@ -38,66 +43,236 @@ const REMOVE_TAGS: [&'static str; 27] = [
 const PICK_TAGS: [&'static str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 
 #[pyfunction]
-fn parse_html(html: String, stop_word: String, force_strong_description: bool) -> PyResult<String> {
-    let mut result: Vec<String> = vec![];
+fn get_sentences(
+    html: String,
+    stop_word: String,
+    remove_header_footer: bool,
+    add_full_ordered_text: bool,
+) -> PyResult<HashMap<String, Vec<String>>> {
+    let html = html
+        .replace("<br>", " ")
+        .replace("<br/>", " ")
+        .replace("<br />", " ");
+    let mut result = HashMap::new();
 
     let document = kuchiki::parse_html().one(html);
 
+    let json_ld = get_json_ld(&document);
+    if json_ld.len() > 0 {
+        result.insert("json_ld".to_string(), json_ld);
+    }
     for tag in REMOVE_TAGS {
         remove_tag(&document, tag);
     }
 
-    if true {
+    if remove_header_footer {
         remove_tag(&document, "header");
         remove_tag(&document, "nav");
         remove_tag(&document, ".header");
         remove_tag(&document, ".header-hero");
     }
 
-    if true {
+    if remove_header_footer {
         remove_tag(&document, "footer");
         remove_tag(&document, ".footer");
         remove_tag(&document, ".footer-hero");
     }
-
-    for tag in PICK_TAGS {
-        let mut text: Vec<String> = get_text_and_remove(&document, tag)
-            .iter()
-            .take(30)
-            .cloned()
-            .collect();
-
-        result.append(&mut text)
-    }
-
-    let mut paragraphs: Vec<String> = get_text_and_remove(&document, "p");
-    paragraphs.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
-
-    let mut paragraphs: Vec<String> = paragraphs
-        .iter()
-        .filter(|x| count_words(x.as_str()) > 2)
-        .map(|x| x.split(". "))
-        .flatten()
-        .map(|x| x.split("! "))
-        .flatten()
-        .map(|x| x.split("? "))
-        .flatten()
-        .map(|x| x.to_string())
-        .filter(|x| count_words(x.as_str()) < 128)
-        .take(30)
-        .collect();
-
-    result.append(&mut paragraphs);
-
-    result.sort();
-    result.dedup();
 
     let stop_word_regex = RegexBuilder::new(stop_word.as_str())
         .case_insensitive(true)
         .build()
         .expect("Invalid Regex");
 
-    result = result
+    if add_full_ordered_text {
+        let mut full_text = get_full_text(&document);
+        full_text = apply(full_text, stop_word_regex.clone());
+        result.insert("full".to_string(), full_text);
+    }
+
+    for tag in PICK_TAGS {
+        let text: Vec<String> = get_text_and_remove(&document, tag)
+            .iter()
+            .cloned()
+            .collect();
+
+        result.insert(tag.to_string(), apply(text, stop_word_regex.clone()));
+    }
+
+    let mut paragraphs: Vec<String> = get_text_and_remove(&document, "p");
+    paragraphs.sort_by(|a, b| count_words(b).cmp(&count_words(a)));
+
+    let paragraphs: Vec<String> = paragraphs
+        .iter()
+        .filter(|x| count_words(x.as_str()) > 2)
+        // .map(|x| x.split(". "))
+        // .flatten()
+        // .map(|x| x.split("! "))
+        // .flatten()
+        // .map(|x| x.split("? "))
+        // .flatten()
+        .map(|x| x.to_string())
+        // .filter(|x| count_words(x.as_str()) < 128)
+        // .take(30)
+        .collect();
+
+    result.insert("p".to_string(), apply(paragraphs, stop_word_regex.clone()));
+
+    let description = get_description(&document);
+    if description.is_some() {
+        result.insert(
+            "description".to_string(),
+            vec![description.clone().unwrap()],
+        );
+    }
+
+    // Keywords
+    let keywords = get_keywords(&document);
+    if keywords.is_some() {
+        result.insert("keywords".to_string(), vec![keywords.unwrap().to_string()]);
+    }
+
+    result.insert("all".to_string(), vec![document.text_contents()]);
+
+    Ok(result)
+}
+
+#[pyfunction]
+fn get_href_attributes(html: String) -> PyResult<Vec<String>> {
+    let document = kuchiki::parse_html().one(html);
+    // let mut links: Vec<String> = vec![];
+
+    let links: Vec<String> = document
+        .select("a")
+        .unwrap()
+        // .collect()
+        .map(|x| {
+            let attributes = x.attributes.borrow();
+            let href = attributes.get("href");
+            if href.is_none() {
+                return "".to_string();
+            }
+            href.unwrap().to_string()
+        })
+        .collect();
+
+    Ok(links)
+}
+
+#[pyfunction]
+fn get_links(html: String) -> PyResult<Vec<(String, String)>> {
+    let document = kuchiki::parse_html().one(html);
+    // let mut links: Vec<String> = vec![];
+
+    let links: Vec<(String, String)> = document
+        .select("a")
+        .unwrap()
+        // .collect()
+        .map(|x| {
+            let attributes = x.attributes.borrow();
+            let href = attributes.get("href");
+            let text = x.text_contents();
+            if href.is_none() {
+                return ("".to_string(), text);
+            }
+            return (href.unwrap().to_string(), text);
+        })
+        .collect();
+
+    Ok(links)
+}
+
+#[pyfunction]
+fn get_emails(html: String) -> PyResult<Vec<String>> {
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Email]);
+    let links = finder.links(html.as_str());
+    let links = links.map(|x| x.as_str().to_string());
+    Ok(links.collect::<Vec<String>>())
+}
+
+#[pyfunction]
+fn get_meta_titles(html: String) -> PyResult<HashMap<String, String>> {
+    let document = kuchiki::parse_html().one(html);
+    let mut result: HashMap<String, String> = HashMap::new();
+    let tag_nodes = document.select("meta").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes: std::cell::Ref<kuchiki::Attributes> = tag_node.attributes.borrow();
+        let name_attribute = attributes.get("name").unwrap_or("");
+        if name_attribute == "twitter:title" || name_attribute == "og:title" {
+            let content = attributes.get("content").unwrap_or("").to_string();
+            if content.is_empty() {
+                continue;
+            }
+            result.insert(name_attribute.to_string(), content);
+        }
+    }
+    let tag_nodes: kuchiki::iter::Select<kuchiki::iter::Elements<kuchiki::iter::Descendants>> =
+        document.select("title").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        result.insert("title".to_string(), tag_node.text_contents().to_string());
+    }
+
+    Ok(result)
+}
+
+#[pyfunction]
+fn tag_attribute(html: String, tag: String, attribute: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    let tag_nodes: kuchiki::iter::Select<kuchiki::iter::Elements<kuchiki::iter::Descendants>> =
+        document.select(tag.as_str()).unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes: std::cell::Ref<kuchiki::Attributes> = tag_node.attributes.borrow();
+        return Ok(attributes.get(attribute).unwrap_or("").to_string());
+    }
+
+    Ok("".to_string())
+}
+
+#[pyfunction]
+fn get_alternate_links(html: String) -> PyResult<HashMap<String, Vec<String>>> {
+    let document = kuchiki::parse_html().one(html);
+    Ok(get_rel_alternate(&document))
+}
+
+#[pyfunction]
+fn html_contents(html: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    for tag in REMOVE_TAGS_HTML_CONTENTS {
+        remove_tag(&document, tag);
+    }
+    Ok(document.to_string())
+}
+
+#[pyfunction]
+fn tag_html_contents(html: String, tag: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    let document = document.select_first(tag.as_str());
+    let res = match document {
+        Ok(v) => v.as_node().to_string(),
+        Err(_) => "".to_string(),
+    };
+
+    Ok(res)
+}
+
+#[pyfunction]
+fn get_lang(html: String) -> PyResult<String> {
+    let document = kuchiki::parse_html().one(html);
+    Ok(get_lang_internal(&document))
+}
+
+fn get_lang_internal(document: &NodeRef) -> String {
+    let tag_nodes = document.select("html").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let type_attribute = attributes.get("lang").unwrap_or("");
+        return type_attribute.to_string();
+    }
+    return "".to_string();
+}
+
+fn apply(sentences: Vec<String>, stop_word_regex: Regex) -> Vec<String> {
+    sentences
         .iter()
         .map(|n| {
             stop_word_regex
@@ -107,31 +282,47 @@ fn parse_html(html: String, stop_word: String, force_strong_description: bool) -
                 .to_string()
         })
         .filter(|n| !n.to_lowercase().contains("cookie") && !n.contains("©") && count_words(n) > 0)
-        .collect();
+        .collect()
+}
 
-    let description = get_description(&document);
-    if description.is_some() {
-        result.push(description.clone().unwrap());
+fn get_json_ld(document: &NodeRef) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    let tag_nodes = document.select("script").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let type_attribute = attributes.get("type").unwrap_or("");
+        if type_attribute == "application/ld+json" {
+            result.push(tag_node.text_contents());
+        }
     }
-    if result.len() < 25 && force_strong_description {
-        if description.is_some() {
-            let description = description.unwrap();
-            let description = description.as_str();
-            let mut i = result.len();
-            while i < 25 {
-                result.push(description.to_string());
-                i = i + 1;
+    return result;
+}
+
+fn get_rel_alternate(document: &NodeRef) -> HashMap<String, Vec<String>> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+    let tag_nodes = document.select("link").unwrap();
+    for tag_node in tag_nodes.collect::<Vec<_>>() {
+        let attributes = tag_node.attributes.borrow();
+        let type_attribute = attributes.get("rel").unwrap_or("");
+        if type_attribute == "alternate" {
+            let hreflang = attributes.get("hreflang").unwrap_or("").to_string();
+            if hreflang.is_empty() {
+                continue;
+            }
+            if result.contains_key(hreflang.as_str()) {
+                let mut new_data = result.get(hreflang.as_str()).unwrap().clone();
+                let new_array = vec![attributes.get("href").unwrap_or("").to_string()];
+                new_data.extend(new_array);
+                result.insert(hreflang, new_data.to_owned());
+            } else {
+                result.insert(
+                    hreflang,
+                    vec![attributes.get("href").unwrap_or("").to_string()],
+                );
             }
         }
     }
-
-    // Keywords
-    let keywords = get_keywords(&document);
-    if keywords.is_some() {
-        result.push(keywords.unwrap().to_string());
-    }
-
-    Ok(result.join("\n"))
+    return result;
 }
 
 fn get_description(document: &NodeRef) -> Option<String> {
@@ -177,6 +368,15 @@ fn get_text_and_remove(document: &NodeRef, tag: &str) -> Vec<String> {
     return result;
 }
 
+fn get_full_text(document: &NodeRef) -> Vec<String> {
+    document.text_contents()
+        .split('\n')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
 fn remove_tag(document: &NodeRef, tag: &str) {
     let tag_nodes = document.select(tag).unwrap();
     for tag_node in tag_nodes.collect::<Vec<_>>() {
@@ -188,7 +388,16 @@ fn remove_tag(document: &NodeRef, tag: &str) {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn html_parsing_tools(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(parse_html, m)?)?;
+    m.add_function(wrap_pyfunction!(get_emails, m)?)?;
+    m.add_function(wrap_pyfunction!(get_links, m)?)?;
+    m.add_function(wrap_pyfunction!(html_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(tag_html_contents, m)?)?;
+    m.add_function(wrap_pyfunction!(tag_attribute, m)?)?;
+    m.add_function(wrap_pyfunction!(get_sentences, m)?)?;
+    m.add_function(wrap_pyfunction!(get_href_attributes, m)?)?;
+    m.add_function(wrap_pyfunction!(get_alternate_links, m)?)?;
+    m.add_function(wrap_pyfunction!(get_lang, m)?)?;
+    m.add_function(wrap_pyfunction!(get_meta_titles, m)?)?;
     Ok(())
 }
 
@@ -234,4 +443,43 @@ fn count_words(s: &str) -> usize {
         total += 1
     }
     total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_sentences() {
+        let html = "\
+            <html>
+            <body>
+            <h1>H1 header</h1>
+            <p>p _stop_ tag</p>
+            </body>
+            </html>
+            ".to_string();
+
+        let result = get_sentences(
+            html,
+            "_stop_".to_string(),
+            false,
+            true,
+        ).unwrap();
+
+        assert_eq!(
+            result["full"],
+            vec!["H1 header", "p  tag"],
+        );
+
+        assert_eq!(
+            result["h1"],
+            vec!["H1 header"],
+        );
+
+        assert_eq!(
+            result["p"],
+            vec!["p  tag"],
+        );
+    }
 }
